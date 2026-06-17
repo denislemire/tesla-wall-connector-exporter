@@ -1,0 +1,12 @@
+{
+  "contactor_cycles": 32,
+  "contactor_cycles_loaded": 28,
+  "alert_count": 125,
+  "thermal_foldbacks": 0,
+  "avg_startup_temp":nan,
+  "charge_starts": 42,
+  "energy_wh": 125000,
+  "connector_cycles": 16,
+  "uptime_s": 110125,
+  "charging_time_s": 13802
+}

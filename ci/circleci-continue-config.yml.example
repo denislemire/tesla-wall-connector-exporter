@@ -1,0 +1,43 @@
+# Example CircleCI continue config — DEFERRED. Do not commit as .circleci/ until CI is enabled.
+version: 2.1
+
+orbs:
+  path-filtering: circleci/path-filtering@1
+
+parameters:
+  run-build:
+    type: boolean
+    default: false
+
+jobs:
+  test:
+    docker:
+      - image: cimg/go:1.23
+    steps:
+      - checkout
+      - run: go test ./...
+
+  build-image-kaniko:
+    docker:
+      - image: alpine/k8s:1.31.2
+    steps:
+      - checkout
+      - run:
+          name: kubeconfig from OIDC
+          command: ./scripts/kubeconfig-from-oidc.sh
+      - run:
+          name: apply Kaniko job
+          command: |
+            export GIT_REF="${CIRCLE_TAG:-main}"
+            export IMAGE_TAG="${CIRCLE_TAG:-sha-${CIRCLE_SHA1:0:7}}"
+            envsubst < ci/kaniko-build-job.yaml.example | kubectl apply -f -
+            kubectl -n build wait --for=condition=complete job/build-tesla-wall-connector-exporter --timeout=900s
+
+workflows:
+  build:
+    when: << pipeline.parameters.run-build >>
+    jobs:
+      - test
+      - build-image-kaniko:
+          requires: [test]
+          context: [your-oidc-k8s-context]

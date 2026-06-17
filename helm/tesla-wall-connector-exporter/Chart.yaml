@@ -1,0 +1,18 @@
+apiVersion: v2
+name: tesla-wall-connector-exporter
+description: Prometheus exporter for Tesla Wall Connector Gen3 (HWPC)
+type: application
+version: 0.1.1
+appVersion: "0.1.1"
+kubeVersion: ">=1.24.0-0"
+home: https://github.com/denislemire/tesla-wall-connector-exporter
+sources:
+  - https://github.com/denislemire/tesla-wall-connector-exporter
+maintainers:
+  - name: Denis Lemire
+    url: https://github.com/denislemire
+keywords:
+  - prometheus
+  - exporter
+  - tesla
+  - ev

@@ -1,0 +1,52 @@
+# Example Kaniko Job — NOT applied by default. Customize registry URLs and namespace.
+# CircleCI job: kubeconfig-from-oidc.sh && envsubst < ci/kaniko-build-job.yaml.example | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: build-tesla-wall-connector-exporter
+  namespace: build
+  annotations:
+    flux.weave.works/ignore: "true"
+spec:
+  ttlSecondsAfterFinished: 86400
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: git-clone
+          image: alpine/git:2.45.2
+          args:
+            - clone
+            - --depth
+            - "1"
+            - --branch
+            - "${GIT_REF}"
+            - https://github.com/denislemire/tesla-wall-connector-exporter.git
+            - /workspace
+          volumeMounts:
+            - name: src
+              mountPath: /workspace
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:v1.23.2
+          args:
+            - --dockerfile=/workspace/Dockerfile
+            - --context=dir:///workspace
+            - --destination=ghcr.io/denislemire/tesla-wall-connector-exporter:${IMAGE_TAG}
+            - --destination=${PRIVATE_REGISTRY}/denislemire/tesla-wall-connector-exporter:${IMAGE_TAG}
+            - --cache=false
+          env:
+            - name: DOCKER_CONFIG
+              value: /kaniko/.docker
+          volumeMounts:
+            - name: src
+              mountPath: /workspace
+            - name: docker-config
+              mountPath: /kaniko/.docker
+      volumes:
+        - name: src
+          emptyDir: {}
+        - name: docker-config
+          secret:
+            secretName: kaniko-registry-auth
