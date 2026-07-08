@@ -1,62 +1,57 @@
-# CI/CD (deferred)
+# CI/CD (EhWS CircleCI)
 
-**Status:** Not active. Build and publish images locally (`make docker-push`) until this pipeline is wired.
-
-This document captures the intended automation for a self-hosted CircleCI Server environment with in-cluster Kaniko (no VM/Docker executor) and GitOps deploy via Flux.
+**Status:** Active on CircleCI Server (`circle.ehws.generic.business`) via KubeVirt machine executor.
 
 ## Goals
 
-1. Run `go test ./...` on every push and tag.
-2. Build container images with **Kaniko** inside the cluster (no machine executor).
-3. Push to **ghcr.io** (public) and a **private registry** mirror used by the home cluster.
-4. Package and publish the Helm chart (OCI).
-5. Let Flux reconcile a `HelmRelease` in the `monitoring` namespace.
+1. Build container images with **Docker on a KubeVirt `linux.medium` VM** (ubuntu-2404 golden image).
+2. Push to the **EhWS Zot registry** at `registry.ehws.generic.business`.
+3. Let Flux reconcile the `HelmRelease` in `ehws-infra` (`clusters/ehws/twc-exporter`).
 
-## Intended flow
+Public **ghcr.io** images remain a separate local or GitHub Actions path (`make docker-push`).
+
+## Flow
 
 ```
-Git push / tag
-  → CircleCI (OIDC token)
-  → Authentik token exchange → kubectl
-  → apply Kaniko Job (git clone tag → build → push)
-  → helm package + OCI push
-  → (optional) Flux ImageUpdateAutomation commits image tag to infra Git
-  → Flux HelmRelease upgrade
+Git push (main / feat branch) or v* tag
+  → CircleCI machine job (KubeVirt ubuntu-2404)
+  → 1Password Secrets Automation (ehws-1password-secrets context)
+  → docker login registry.ehws.generic.business
+  → docker build + push (multi-tag on release)
+  → Flux HelmRelease picks up new tag in ehws-infra
 ```
 
-## CircleCI OIDC → Kubernetes
+## CircleCI setup
 
-Reference pattern (operator docs in consuming infra repos):
+| Item | Value |
+|------|-------|
+| Config | `.circleci/config.yml` |
+| Executor | `machine` / `ubuntu-2404:current` / `resource_class: medium` |
+| Context | `ehws-1password-secrets` (`OP_SERVICE_ACCOUNT_TOKEN`) |
+| Orb | `onepassword/secrets@1` |
+| Zot creds | `op://EhWS Secrets/Registry EHWS - Zot htpasswd/{username,password}` |
 
-- Job image: `alpine/k8s`
-- Context holds: API server URL, cluster CA (base64), Authentik token URL
-- Job receives `CIRCLE_OIDC_TOKEN_V2` automatically
-- Script exchanges CircleCI JWT for Authentik access token with `aud=kubernetes-cluster`
-- RBAC binds group `oidc:circleci-oidc` to permissions needed to create Kaniko Jobs
+See `ehws-infra` → `docs/CIRCLECI_1PASSWORD_SECRETS.md` for context and 1Password service-account setup.
 
-See `ci/kubeconfig-from-oidc.sh.example` for the token exchange skeleton.
+### Image tags
 
-## Kaniko Job (no VM)
+| Trigger | Tags pushed |
+|---------|-------------|
+| Branch push (`main`, `feat/circleci-kubevirt-zot-build`) | `sha-<7>`, `branch-<name>` |
+| Git tag `v*` | `vX.Y.Z`, `X.Y.Z`, `X.Y`, `sha-<7>` |
 
-Reference: `ci/kaniko-build-job.yaml.example`
+Registry path: `registry.ehws.generic.business/tesla-wall-connector-exporter`.
 
-- Init container clones the tagged Git release
-- Kaniko builds `Dockerfile` and pushes to configured registries
-- Registry credentials via Kubernetes Secrets mounted at `/kaniko/.docker`
+### Deploy (Flux)
 
-## Enabling CI later
+After a release tag is pushed, bump `image.tag` in `ehws-infra/clusters/ehws/twc-exporter/helm-release.yaml` and reconcile. Ensure `image.repository` matches the Zot path above.
 
-1. Copy `ci/circleci-continue-config.yml.example` → `.circleci/continue-config.yml` and add a root `config.yml` with path-filtering if desired.
-2. Create CircleCI project; add context with cluster/OIDC variables.
-3. Ensure Kaniko namespace, registry push secret, and RBAC exist in the cluster.
-4. Remove the **deferred** banner from this file once a green pipeline exists.
+## KubeVirt / DNS prerequisites
 
-## Public vs private artifacts
+Machine jobs resolve EhWS hostnames via in-cluster CoreDNS static hosts (not LAN split-horizon). Required entries are documented in `ehws-infra/clusters/ehws/circleci-machines/README.md`.
 
-| Artifact | Public | Private mirror |
-|----------|--------|----------------|
-| Container image | `ghcr.io/denislemire/tesla-wall-connector-exporter:<tag>` | Operator-specific registry path |
-| Helm chart | Git tag in this repo | OCI push to operator registry (optional) |
-| Flux manifests | N/A | Operator infra Git only |
+Troubleshooting hangs: `ehws-infra/scripts/diagnose-kubevirt-machine-executor.sh`.
 
-Nothing in this repo should hard-code operator hostnames or registry URLs beyond the public ghcr.io default in the Helm chart.
+## Legacy reference (Kaniko / OIDC)
+
+The `ci/*.example` files describe an alternate in-cluster Kaniko + OIDC pattern that is **not** the active EhWS pipeline. Kept for reference only.

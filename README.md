@@ -126,7 +126,12 @@ make docker-push VERSION=v0.1.1 IMAGE=registry.example.com/denislemire/tesla-wal
 
 ## CI/CD
 
-Automated build and deploy pipelines are **not enabled yet**. See [docs/CICD.md](docs/CICD.md) for the intended design and `ci/*.example` reference configs.
+Images are published to:
+
+- **GitHub Container Registry:** `ghcr.io/denislemire/tesla-wall-connector-exporter` (local `make docker-push` or future GitHub Actions)
+- **EhWS internal registry:** `registry.ehws.generic.business/tesla-wall-connector-exporter` (CircleCI Server, KubeVirt `linux.medium` machine executor)
+
+EhWS CircleCI requires context **`ehws-1password-secrets`** with `OP_SERVICE_ACCOUNT_TOKEN`. See [docs/CICD.md](docs/CICD.md) and `ehws-infra` → `docs/CIRCLECI_1PASSWORD_SECRETS.md`.
 
 ## License
 

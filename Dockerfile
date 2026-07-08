@@ -6,6 +6,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/tesla-wall-connector-exporter ./cmd/tesla-wall-connector-exporter
 
 FROM gcr.io/distroless/static-debian12:nonroot

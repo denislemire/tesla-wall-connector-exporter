@@ -1,4 +1,5 @@
-# Example CircleCI continue config — DEFERRED. Do not commit as .circleci/ until CI is enabled.
+# Legacy example — Kaniko + OIDC (not the active EhWS pipeline).
+# Active CI: .circleci/config.yml (KubeVirt machine executor + 1Password + Zot).
 version: 2.1
 
 orbs:
